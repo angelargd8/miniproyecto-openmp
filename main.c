@@ -102,18 +102,41 @@ void imprimirMatriz(Celda** grid, int filas, int cols) {
         for (int j = 0; j < cols; j++) {
             SerVivo* s = grid[i][j].ocupante;
             if (s == NULL) {
-                printf("⬜ ");
+                printf("B ");
             } else {
                 switch (s->tipo) {
-                    case PLANTA: printf("🌿 "); break;
-                    case HERVIVORO: printf("🦓 "); break;
-                    case CARNIVORO: printf("🦁 "); break;
-                    default: printf("⬜ ");
+                    case PLANTA: printf("P "); break;
+                    case HERVIVORO: printf("H "); break;
+                    case CARNIVORO: printf("C "); break;
+                    default: printf("B ");
                 }
             }
         }
         printf("\n");
     }
+}
+
+void contarSeresVivos(Celda** grid, int filas, int cols, int* plantas, int* hervivoros, int* carnivoros) {
+    int p = 0, h = 0, c = 0;
+
+    #pragma omp parallel for reduction(+:p,h,c)
+    for (int i = 0; i < filas; i++) {
+        for (int j = 0; j < cols; j++) {
+            SerVivo* s = grid[i][j].ocupante;
+            if (s != NULL) {
+                switch (s->tipo) {
+                    case PLANTA: p++; break;
+                    case HERVIVORO: h++; break;
+                    case CARNIVORO: c++; break;
+                    default: break;
+                }
+            }
+        }
+    }
+
+    *plantas = p;
+    *hervivoros = h;
+    *carnivoros = c;
 }
 
 
@@ -143,8 +166,11 @@ int main(){
         printf("tick: %d\n", tick);
         //para cada celda: actualizar plantas, herbivoros, carnivoros
         //#pragma omp parallel for 
-        
-        
+        int plantas = 0, hervivoros = 0, carnivoros = 0;
+        contarSeresVivos(mundo, FILAS, COLUMNAS, &plantas, &hervivoros, &carnivoros);
+
+        printf("Plantas: %d\nHervivoros: %d\nCarnivoros: %d\n\n", plantas, hervivoros, carnivoros);
+
     }
 
     //sincronicar datos de especies entre hilos
