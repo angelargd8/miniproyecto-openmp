@@ -159,7 +159,9 @@ int main(){
     srand(semilla);
     Celda** mundo = crearMatriz(FILAS, COLUMNAS);
     poblarMatriz(mundo, FILAS, COLUMNAS);
+    printf("\nDistribucion inicial:\n");
     imprimirMatriz(mundo, FILAS, COLUMNAS);
+    printf("\n\n");
 
     //Para cada tick de la simulación: 
     for (int tick=0; tick < MAX_TICKS; tick++){
@@ -170,6 +172,10 @@ int main(){
         contarSeresVivos(mundo, FILAS, COLUMNAS, &plantas, &hervivoros, &carnivoros);
 
         printf("Plantas: %d\nHervivoros: %d\nCarnivoros: %d\n\n", plantas, hervivoros, carnivoros);
+        printf("Distribucion:\n");
+        imprimirMatriz(mundo, FILAS, COLUMNAS);
+        printf("\n\n");
+        
 
     }
 
