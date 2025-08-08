@@ -325,12 +325,12 @@ int main(){
     srand(semilla);
     Celda** mundo = crearMatriz(FILAS, COLUMNAS);
     poblarMatriz(mundo, FILAS, COLUMNAS);
-    printf("\nDistribucion inicial:\n");
-    imprimirMatriz(mundo, FILAS, COLUMNAS);
-    printf("\n\n");
-
     int plantas = 0, hervivoros = 0, carnivoros = 0;
     contarSeresVivos(mundo, FILAS, COLUMNAS, &plantas, &hervivoros, &carnivoros);
+    printf("\nPlantas: %d\nHervivoros: %d\nCarnivoros: %d\n", plantas, hervivoros, carnivoros);
+    printf("Distribucion inicial:\n");
+    imprimirMatriz(mundo, FILAS, COLUMNAS);
+    printf("\n\n");
 
     //Para cada tick de la simulación: 
     for (int tick=0; tick < MAX_TICKS; tick++){
@@ -343,9 +343,13 @@ int main(){
         reproducirHervivoros(mundo, FILAS, COLUMNAS);
         reproducirCarnivoros(mundo, FILAS, COLUMNAS);
 
+        plantas = 0;
+        hervivoros = 0;
+        carnivoros = 0;
+
         contarSeresVivos(mundo, FILAS, COLUMNAS, &plantas, &hervivoros, &carnivoros);
 
-        printf("Plantas: %d\nHervivoros: %d\nCarnivoros: %d\n\n", plantas, hervivoros, carnivoros);
+        printf("Plantas: %d\nHervivoros: %d\nCarnivoros: %d\n", plantas, hervivoros, carnivoros);
         printf("Distribucion:\n");
         imprimirMatriz(mundo, FILAS, COLUMNAS);
         printf("\n\n");
