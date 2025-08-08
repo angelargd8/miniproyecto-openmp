@@ -9,7 +9,9 @@ reglas del ecosistema:
 - Interaccion entre especies: depredación, competencia por recursos
 */
 
-//librerias:
+// ===================================================
+// =============== LIBRERÍAS Y CONSTANTES ============
+// ===================================================
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,7 +20,7 @@ reglas del ecosistema:
 //tamanios y valores fijos:
 #define FILAS 8
 #define COLUMNAS 8
-#define MAX_TICKS 10
+#define MAX_TICKS 12
 
 #define RESET   "\033[0m"
 #define VERDE   "\033[0;32m"
@@ -26,7 +28,9 @@ reglas del ecosistema:
 #define ROJO    "\033[0;31m"
 #define GRIS    "\033[0;37m"
 
-
+// ===================================================
+// =================== ENUMS Y ESTRUCTURAS ===========
+// ===================================================
 //tipos de ser vivos
 typedef enum {
     VACIO, 
@@ -59,6 +63,9 @@ typedef struct {
 } Celda;
 
 
+// ===================================================
+// ================== FUNCIONES HELPERS ==============
+// ===================================================
 Celda** crearMatriz(int filas, int cols) {
     Celda** grid = malloc(filas * sizeof(Celda*));
     for (int i = 0; i < filas; i++) {
@@ -158,6 +165,56 @@ void contarSeresVivos(Celda** grid, int filas, int cols, int* plantas, int* herv
     *carnivoros = c;
 }
 
+// ===================================================
+// ============== ESTADO Y LIMPIEZA ==================
+// ===================================================
+void actualizarEstado(Celda** grid, int filas, int cols) {
+    #pragma omp parallel for collapse(2)
+    for (int i = 0; i < filas; i++) {
+        for (int j = 0; j < cols; j++) {
+            SerVivo* s = grid[i][j].ocupante;
+            if (s != NULL) {
+                s->edad += 1;
+
+                if (s->tipo == HERVIVORO || s->tipo == CARNIVORO) {
+                    s->energia -= 1.0f;
+                }
+            }
+        }
+    }
+}
+
+void limpiarMuertos(Celda** grid, int filas, int cols) {
+    #pragma omp parallel for collapse(2)
+    for (int i = 0; i < filas; i++) {
+        for (int j = 0; j < cols; j++) {
+            SerVivo* s = grid[i][j].ocupante;
+            if (s != NULL) {
+                int eliminar = 0;
+
+                switch (s->tipo) {
+                    case PLANTA:
+                        if (s->edad > 10) eliminar = 1;
+                        break;
+                    case HERVIVORO:
+                        if (s->edad > 15 || s->energia < -3.0f) eliminar = 1;
+                        break;
+                    case CARNIVORO:
+                        if (s->edad > 20 || s->energia < -3.0f) eliminar = 1;
+                        break;
+                    default:
+                        break;
+                }
+
+                if (eliminar) {
+                    free(s);
+                    grid[i][j].ocupante = NULL;
+                }
+            }
+        }
+    }
+}
+
 void limpiarAcciones(Celda** grid, int filas, int cols) {
     #pragma omp parallel for collapse(2)
     for (int i = 0; i < filas; i++) {
@@ -169,6 +226,10 @@ void limpiarAcciones(Celda** grid, int filas, int cols) {
         }
     }
 }
+
+// ===================================================
+// ==================== REPRODUCCIÓN =================
+// ===================================================
 
 void reproducirPlantas(Celda** grid, int filas, int cols) {
     #pragma omp parallel for collapse(2)
@@ -310,6 +371,9 @@ siguiente:;
     }
 }
 
+// ===================================================
+// ================ CONSUMO DE RECURSOS ==============
+// ===================================================
 void herbivorosConsume(Celda** grid, int filas, int cols) {
     #pragma omp parallel for collapse(2)
     for (int i = 0; i < filas; i++) {
@@ -418,6 +482,9 @@ Sincronizar datos de especies entre hilos
 Mostrar estado del ecosistema 
 Fin Para
 */
+// ===================================================
+// ======================== MAIN =====================
+// ===================================================
 int main(){
     //Inicializar cuadrícula y especies
     int semilla = 60;
@@ -445,6 +512,10 @@ int main(){
         reproducirPlantas(mundo, FILAS, COLUMNAS); 
         reproducirHervivoros(mundo, FILAS, COLUMNAS);
         reproducirCarnivoros(mundo, FILAS, COLUMNAS);
+
+        // Actualizacion y limpieza
+        actualizarEstado(mundo, FILAS, COLUMNAS);
+        limpiarMuertos(mundo, FILAS, COLUMNAS);
 
         plantas = 0;
         hervivoros = 0;
