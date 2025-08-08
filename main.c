@@ -216,6 +216,95 @@ siguiente_planta:;
     }
 }
 
+void reproducirHervivoros(Celda** grid, int filas, int cols) {
+    #pragma omp parallel for collapse(2)
+    for (int i = 0; i < filas; i++) {
+        for (int j = 0; j < cols; j++) {
+            SerVivo* h = grid[i][j].ocupante;
+
+            if (h && h->tipo == HERVIVORO && h->accion == NINGUNA && h->energia >= 3.0f) {
+                for (int dx = -1; dx <= 1; dx++) {
+                    for (int dy = -1; dy <= 1; dy++) {
+                        if (dx == 0 && dy == 0) continue;
+
+                        int ni = i + dx;
+                        int nj = j + dy;
+
+                        if (ni >= 0 && ni < filas && nj >= 0 && nj < cols) {
+                            if (grid[ni][nj].ocupante == NULL) {
+                                SerVivo* hijo = malloc(sizeof(SerVivo));
+                                hijo->tipo = HERVIVORO;
+                                hijo->vida = 100;
+                                hijo->energia = 2.0f;
+                                hijo->edad = 0;
+                                hijo->accion = NINGUNA;
+
+                                #pragma omp critical
+                                {
+                                    if (grid[ni][nj].ocupante == NULL) {
+                                        grid[ni][nj].ocupante = hijo;
+                                        h->energia -= 2.0f;
+                                        h->accion = REPRODUCIRSE;
+                                    } else {
+                                        free(hijo);
+                                    }
+                                }
+                                goto siguiente;
+                            }
+                        }
+                    }
+                }
+            }
+siguiente:;
+        }
+    }
+}
+
+void reproducirCarnivoros(Celda** grid, int filas, int cols) {
+    #pragma omp parallel for collapse(2)
+    for (int i = 0; i < filas; i++) {
+        for (int j = 0; j < cols; j++) {
+            SerVivo* c = grid[i][j].ocupante;
+
+            if (c && c->tipo == CARNIVORO && c->accion == NINGUNA && c->energia >= 3.0f) {
+                for (int dx = -1; dx <= 1; dx++) {
+                    for (int dy = -1; dy <= 1; dy++) {
+                        if (dx == 0 && dy == 0) continue;
+
+                        int ni = i + dx;
+                        int nj = j + dy;
+
+                        if (ni >= 0 && ni < filas && nj >= 0 && nj < cols) {
+                            if (grid[ni][nj].ocupante == NULL) {
+                                SerVivo* hijo = malloc(sizeof(SerVivo));
+                                hijo->tipo = CARNIVORO;
+                                hijo->vida = 100;
+                                hijo->energia = 2.0f;
+                                hijo->edad = 0;
+                                hijo->accion = NINGUNA;
+
+                                #pragma omp critical
+                                {
+                                    if (grid[ni][nj].ocupante == NULL) {
+                                        grid[ni][nj].ocupante = hijo;
+                                        c->energia -= 2.0f;
+                                        c->accion = REPRODUCIRSE;
+                                    } else {
+                                        free(hijo);
+                                    }
+                                }
+                                goto siguiente;
+                            }
+                        }
+                    }
+                }
+            }
+siguiente:;
+        }
+    }
+}
+
+
 
 /*
 Pseudocodigo del sistema:
@@ -240,14 +329,20 @@ int main(){
     imprimirMatriz(mundo, FILAS, COLUMNAS);
     printf("\n\n");
 
+    int plantas = 0, hervivoros = 0, carnivoros = 0;
+    contarSeresVivos(mundo, FILAS, COLUMNAS, &plantas, &hervivoros, &carnivoros);
+
     //Para cada tick de la simulación: 
     for (int tick=0; tick < MAX_TICKS; tick++){
         printf("tick: %d\n", tick);
         //para cada celda: actualizar plantas, herbivoros, carnivoros
         //#pragma omp parallel for 
 
+        // Reproduccion
         reproducirPlantas(mundo, FILAS, COLUMNAS); 
-        int plantas = 0, hervivoros = 0, carnivoros = 0;
+        reproducirHervivoros(mundo, FILAS, COLUMNAS);
+        reproducirCarnivoros(mundo, FILAS, COLUMNAS);
+
         contarSeresVivos(mundo, FILAS, COLUMNAS, &plantas, &hervivoros, &carnivoros);
 
         printf("Plantas: %d\nHervivoros: %d\nCarnivoros: %d\n\n", plantas, hervivoros, carnivoros);
