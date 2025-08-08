@@ -21,6 +21,13 @@ reglas del ecosistema:
 #define COLUMNAS 8
 #define MAX_TICKS 10
 
+#define RESET   "\033[0m"
+#define VERDE   "\033[0;32m"
+#define AZUL    "\033[0;34m"
+#define ROJO    "\033[0;31m"
+#define GRIS    "\033[0;37m"
+
+
 //tipos de ser vivos
 typedef enum {
     VACIO, 
@@ -29,12 +36,22 @@ typedef enum {
     CARNIVORO 
 } TipoSerVivo;
 
+typedef enum {
+    NINGUNA,
+    MOVER,
+    COMER,
+    REPRODUCIRSE,
+    MORIR
+} Accion;
+
+
 //ser vivo
 typedef struct {
     TipoSerVivo tipo;
     float vida;
     float energia;
     int edad;
+    Accion accion;
 } SerVivo;
 
 
@@ -66,18 +83,21 @@ SerVivo* crearRandom() {
         //no tiene energia ni edad, no se deberian de tomar en cuenta, pero estan porque esta en la estructura de ser vivo
         nuevo->energia = 0;
         nuevo->edad = 0;
+        nuevo->accion = NINGUNA;
 
     }else if (r < 7) {      
         nuevo->tipo = HERVIVORO;
         nuevo->vida = 100;
         nuevo->energia = 70.00;
         nuevo->edad = 0;
+        nuevo->accion = NINGUNA;
 
     }else if (r < 9) {
         nuevo->tipo = CARNIVORO;
         nuevo->vida = 100;
         nuevo->energia = 80.00;
         nuevo->edad = 0;
+        nuevo->accion = NINGUNA;
     } 
     else { 
         //Free es para liberar la memoria cuando ya no lo necesita
@@ -105,10 +125,10 @@ void imprimirMatriz(Celda** grid, int filas, int cols) {
                 printf("B ");
             } else {
                 switch (s->tipo) {
-                    case PLANTA: printf("P "); break;
-                    case HERVIVORO: printf("H "); break;
-                    case CARNIVORO: printf("C "); break;
-                    default: printf("B ");
+                    case PLANTA: printf(VERDE "P " RESET); break;
+                    case HERVIVORO: printf(AZUL "H " RESET); break;
+                    case CARNIVORO: printf(ROJO "C " RESET); break;
+                    default: printf(GRIS "B " RESET);
                 }
             }
         }
@@ -137,6 +157,63 @@ void contarSeresVivos(Celda** grid, int filas, int cols, int* plantas, int* herv
     *plantas = p;
     *hervivoros = h;
     *carnivoros = c;
+}
+
+void limpiarAcciones(Celda** grid, int filas, int cols) {
+    #pragma omp parallel for collapse(2)
+    for (int i = 0; i < filas; i++) {
+        for (int j = 0; j < cols; j++) {
+            SerVivo* s = grid[i][j].ocupante;
+            if (s != NULL) {
+                s->accion = NINGUNA;
+            }
+        }
+    }
+}
+
+void reproducirPlantas(Celda** grid, int filas, int cols) {
+    #pragma omp parallel for collapse(2)
+    for (int i = 0; i < filas; i++) {
+        for (int j = 0; j < cols; j++) {
+            SerVivo* ocupante = grid[i][j].ocupante;
+            if (ocupante && ocupante->tipo == PLANTA && ocupante->accion == NINGUNA) {
+
+                if ((rand() % 100) < 30) {
+                    for (int dx = -1; dx <= 1; dx++) {
+                        for (int dy = -1; dy <= 1; dy++) {
+                            if (dx == 0 && dy == 0) continue;
+
+                            int ni = i + dx;
+                            int nj = j + dy;
+
+                            if (ni >= 0 && ni < filas && nj >= 0 && nj < cols) {
+                                if (grid[ni][nj].ocupante == NULL) {
+                                    SerVivo* nueva = malloc(sizeof(SerVivo));
+                                    nueva->tipo = PLANTA;
+                                    nueva->vida = 100;
+                                    nueva->energia = 0;
+                                    nueva->edad = 0;
+                                    nueva->accion = NINGUNA;
+
+                                    #pragma omp critical
+                                    {
+                                        if (grid[ni][nj].ocupante == NULL) {
+                                            grid[ni][nj].ocupante = nueva;
+                                        } else {
+                                            free(nueva);
+                                        }
+                                    }
+                                    ocupante->accion = REPRODUCIRSE;
+                                    goto siguiente_planta;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+siguiente_planta:;
+        }
+    }
 }
 
 
@@ -168,6 +245,8 @@ int main(){
         printf("tick: %d\n", tick);
         //para cada celda: actualizar plantas, herbivoros, carnivoros
         //#pragma omp parallel for 
+
+        reproducirPlantas(mundo, FILAS, COLUMNAS); 
         int plantas = 0, hervivoros = 0, carnivoros = 0;
         contarSeresVivos(mundo, FILAS, COLUMNAS, &plantas, &hervivoros, &carnivoros);
 
