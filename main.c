@@ -128,13 +128,13 @@ void imprimirMatriz(Celda** grid, int filas, int cols) {
         for (int j = 0; j < cols; j++) {
             SerVivo* s = grid[i][j].ocupante;
             if (s == NULL) {
-                printf("B ");
+                printf("⬜ ");
             } else {
                 switch (s->tipo) {
-                    case PLANTA: printf(VERDE "P " RESET); break;
-                    case HERVIVORO: printf(AZUL "H " RESET); break;
-                    case CARNIVORO: printf(ROJO "C " RESET); break;
-                    default: printf(GRIS "B " RESET);
+                    case PLANTA: printf(VERDE "🌿 " RESET); break;
+                    case HERVIVORO: printf(AZUL "🦓 " RESET); break;
+                    case CARNIVORO: printf(ROJO "🦁 " RESET); break;
+                    default: printf(GRIS "⬜ " RESET);
                 }
             }
         }
@@ -469,6 +469,120 @@ siguiente_carnivoro:;
 }
 
 
+// ===================================================
+// ======================== MOVIMIENTO =====================
+// ===================================================
+
+// Movimiento de Herbívoros
+void moverHerbivoros(Celda** grid, int filas, int cols) {
+    #pragma omp parallel for collapse(2)
+    for (int i = 0; i < filas; i++) {
+        for (int j = 0; j < cols; j++) {
+            SerVivo* h = grid[i][j].ocupante;
+            if (h && h->tipo == HERVIVORO && h->accion == NINGUNA) {
+                
+                int peligro = 0;
+                // Detectar si hay un carnívoro cerca
+                for (int dx = -1; dx <= 1 && !peligro; dx++) {
+                    for (int dy = -1; dy <= 1 && !peligro; dy++) {
+                        if (dx == 0 && dy == 0) continue;
+                        int ni = i + dx, nj = j + dy;
+                        if (ni >= 0 && ni < filas && nj >= 0 && nj < cols) {
+                            SerVivo* vecino = grid[ni][nj].ocupante;
+                            if (vecino && vecino->tipo == CARNIVORO) {
+                                peligro = 1;
+                            }
+                        }
+                    }
+                }
+
+                // Intentar moverse a celda vacía
+                int dirs[8][2] = {
+                    {-1, 0}, {1, 0}, {0, -1}, {0, 1},
+                    {-1, -1}, {-1, 1}, {1, -1}, {1, 1}
+                };
+                int mov_realizado = 0;
+                for (int intento = 0; intento < 8 && !mov_realizado; intento++) {
+                    // Selecciona aleatoriamente una de las 8 direcciones posibles
+                    int idx = rand() % 8; // aleatorio
+                    int ni = i + dirs[idx][0];
+                    int nj = j + dirs[idx][1];
+                    if (ni >= 0 && ni < filas && nj >= 0 && nj < cols) {
+                        if (grid[ni][nj].ocupante == NULL) {  // Comprueba si la celda destino está vacía
+                            #pragma omp critical
+                            {
+                                // cambio de celda
+                                if (grid[ni][nj].ocupante == NULL) {
+                                    grid[ni][nj].ocupante = h;
+                                    grid[i][j].ocupante = NULL;
+                                    h->accion = MOVER;
+                                    mov_realizado = 1;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Movimiento de Carnívoros
+void moverCarnivoros(Celda** grid, int filas, int cols) {
+    #pragma omp parallel for collapse(2)
+    for (int i = 0; i < filas; i++) {
+        for (int j = 0; j < cols; j++) {
+            SerVivo* c = grid[i][j].ocupante;
+            if (c && c->tipo == CARNIVORO && c->accion == NINGUNA) {
+
+                int presa_cerca = 0;
+                // Detectar si hay herbívoro cerca
+                for (int dx = -1; dx <= 1 && !presa_cerca; dx++) {
+                    for (int dy = -1; dy <= 1 && !presa_cerca; dy++) {
+                        if (dx == 0 && dy == 0) continue;
+                        int ni = i + dx, nj = j + dy;
+                        if (ni >= 0 && ni < filas && nj >= 0 && nj < cols) {
+                            SerVivo* vecino = grid[ni][nj].ocupante;
+                            if (vecino && vecino->tipo == HERVIVORO) {
+                                presa_cerca = 1;
+                            }
+                        }
+                    }
+                }
+
+                // Si no hay presa cerca, moverse
+                if (!presa_cerca) {
+                    int dirs[8][2] = {
+                        {-1, 0}, {1, 0}, {0, -1}, {0, 1},
+                        {-1, -1}, {-1, 1}, {1, -1}, {1, 1}
+                    };
+                    int mov_realizado = 0;
+                    for (int intento = 0; intento < 8 && !mov_realizado; intento++) {
+                        int idx = rand() % 8;
+                        int ni = i + dirs[idx][0];
+                        int nj = j + dirs[idx][1];
+                        if (ni >= 0 && ni < filas && nj >= 0 && nj < cols) {
+                            if (grid[ni][nj].ocupante == NULL) {
+                                #pragma omp critical
+                                {
+                                    if (grid[ni][nj].ocupante == NULL) {
+                                        grid[ni][nj].ocupante = c;
+                                        grid[i][j].ocupante = NULL;
+                                        c->accion = MOVER;
+                                        mov_realizado = 1;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+
 /*
 Pseudocodigo del sistema:
 Inicializar cuadrícula y especies
@@ -486,55 +600,48 @@ Fin Para
 // ======================== MAIN =====================
 // ===================================================
 int main(){
-    //Inicializar cuadrícula y especies
+    // Inicializar cuadrícula y especies
     int semilla = 60;
     srand(semilla);
     Celda** mundo = crearMatriz(FILAS, COLUMNAS);
     poblarMatriz(mundo, FILAS, COLUMNAS);
     int plantas = 0, hervivoros = 0, carnivoros = 0;
+    
     printf("Distribucion inicial:\n");
     contarSeresVivos(mundo, FILAS, COLUMNAS, &plantas, &hervivoros, &carnivoros);
     printf("\nPlantas: %d\nHervivoros: %d\nCarnivoros: %d\n", plantas, hervivoros, carnivoros);
     imprimirMatriz(mundo, FILAS, COLUMNAS);
     printf("\n\n");
 
-    //Para cada tick de la simulación: 
-    for (int tick=0; tick < MAX_TICKS; tick++){
+    // Para cada tick de la simulación
+    for (int tick = 0; tick < MAX_TICKS; tick++){
         printf("tick: %d\n", tick);
-        //para cada celda: actualizar plantas, herbivoros, carnivoros
-        //#pragma omp parallel for 
+
+        // Movimiento primero (huida/búsqueda)
+        moverHerbivoros(mundo, FILAS, COLUMNAS);
+        moverCarnivoros(mundo, FILAS, COLUMNAS);
 
         // Consumo de recursos
         herbivorosConsume(mundo, FILAS, COLUMNAS);
         carnivorosConsume(mundo, FILAS, COLUMNAS);
 
-        // Reproduccion
+        // Reproducción
         reproducirPlantas(mundo, FILAS, COLUMNAS); 
         reproducirHervivoros(mundo, FILAS, COLUMNAS);
         reproducirCarnivoros(mundo, FILAS, COLUMNAS);
 
-        // Actualizacion y limpieza
+        // Actualización y limpieza
         actualizarEstado(mundo, FILAS, COLUMNAS);
         limpiarMuertos(mundo, FILAS, COLUMNAS);
 
-        plantas = 0;
-        hervivoros = 0;
-        carnivoros = 0;
-
+        // Contar y mostrar estado
+        plantas = hervivoros = carnivoros = 0;
         printf("Distribucion:\n");
         contarSeresVivos(mundo, FILAS, COLUMNAS, &plantas, &hervivoros, &carnivoros);
-
         printf("Plantas: %d\nHervivoros: %d\nCarnivoros: %d\n", plantas, hervivoros, carnivoros);
         imprimirMatriz(mundo, FILAS, COLUMNAS);
         printf("\n\n");
-        
-
     }
-
-    //sincronicar datos de especies entre hilos
-
-    //mostrar estado del ecosistema
-    
 
     return 0;
 }
