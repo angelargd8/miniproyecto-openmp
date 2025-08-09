@@ -128,13 +128,13 @@ void imprimirMatriz(Celda** grid, int filas, int cols) {
         for (int j = 0; j < cols; j++) {
             SerVivo* s = grid[i][j].ocupante;
             if (s == NULL) {
-                printf("⬜ ");
+                printf("B ");
             } else {
                 switch (s->tipo) {
-                    case PLANTA: printf(VERDE "🌿 " RESET); break;
-                    case HERVIVORO: printf(AZUL "🦓 " RESET); break;
-                    case CARNIVORO: printf(ROJO "🦁 " RESET); break;
-                    default: printf(GRIS "⬜ " RESET);
+                    case PLANTA: printf(VERDE "P " RESET); break;
+                    case HERVIVORO: printf(AZUL "H " RESET); break;
+                    case CARNIVORO: printf(ROJO "C " RESET); break;
+                    default: printf(GRIS "B " RESET);
                 }
             }
         }
@@ -184,6 +184,21 @@ void actualizarEstado(Celda** grid, int filas, int cols) {
     }
 }
 
+static inline int ansiedadPlantas(Celda** grid, int i, int j, int filas, int cols) {
+    for (int dx = -1; dx <= 1; dx++) {
+        for (int dy = -1; dy <= 1; dy++) {
+            if (dx == 0 && dy == 0) continue;
+            int ni = i + dx, nj = j + dy;
+            if (ni >= 0 && ni < filas && nj >= 0 && nj < cols) {
+                if (grid[ni][nj].ocupante == NULL) {
+                    return 0;
+                }
+            }
+        }
+    }
+    return 1;
+}
+
 void limpiarMuertos(Celda** grid, int filas, int cols) {
     #pragma omp parallel for collapse(2)
     for (int i = 0; i < filas; i++) {
@@ -194,7 +209,7 @@ void limpiarMuertos(Celda** grid, int filas, int cols) {
 
                 switch (s->tipo) {
                     case PLANTA:
-                        if (s->edad > 10) eliminar = 1;
+                        if (s->edad > 10 || ansiedadPlantas(grid, i, j, filas, cols)) eliminar = 1;
                         break;
                     case HERVIVORO:
                         if (s->edad > 15 || s->energia < -3.0f) eliminar = 1;
@@ -444,16 +459,15 @@ void carnivorosConsume(Celda** grid, int filas, int cols) {
                                     }
                                 }
                                 goto siguiente_carnivoro;
-                            }
-                            if (vecino && vecino->tipo == PLANTA) {
+                            } else if (vecino && vecino->tipo == PLANTA) {
 
                                 #pragma omp critical
                                 {
-                                    if (grid[ni][nj].ocupante && grid[ni][nj].ocupante->tipo == HERVIVORO && (rand() % 100) < 50) {
+                                    if (grid[ni][nj].ocupante && grid[ni][nj].ocupante->tipo == PLANTA && (rand() % 100) < 50) {
 
                                         free(grid[ni][nj].ocupante);
                                         grid[ni][nj].ocupante = NULL;
-                                        c->energia += 2.0f;
+                                        c->energia += 1.0f;
                                         c->accion = COMER;
                                     }
                                 }
