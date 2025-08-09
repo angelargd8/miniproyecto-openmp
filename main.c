@@ -169,7 +169,7 @@ void contarSeresVivos(Celda** grid, int filas, int cols, int* plantas, int* herv
 // ============== ESTADO Y LIMPIEZA ==================
 // ===================================================
 void actualizarEstado(Celda** grid, int filas, int cols) {
-    #pragma omp parallel for collapse(2)
+    #pragma omp for collapse(2)
     for (int i = 0; i < filas; i++) {
         for (int j = 0; j < cols; j++) {
             SerVivo* s = grid[i][j].ocupante;
@@ -184,6 +184,7 @@ void actualizarEstado(Celda** grid, int filas, int cols) {
     }
 }
 
+// planta encerrada
 static inline int ansiedadPlantas(Celda** grid, int i, int j, int filas, int cols) {
     for (int dx = -1; dx <= 1; dx++) {
         for (int dy = -1; dy <= 1; dy++) {
@@ -200,7 +201,7 @@ static inline int ansiedadPlantas(Celda** grid, int i, int j, int filas, int col
 }
 
 void limpiarMuertos(Celda** grid, int filas, int cols) {
-    #pragma omp parallel for collapse(2)
+    #pragma omp for collapse(2)
     for (int i = 0; i < filas; i++) {
         for (int j = 0; j < cols; j++) {
             SerVivo* s = grid[i][j].ocupante;
@@ -231,7 +232,7 @@ void limpiarMuertos(Celda** grid, int filas, int cols) {
 }
 
 void limpiarAcciones(Celda** grid, int filas, int cols) {
-    #pragma omp parallel for collapse(2)
+    #pragma omp for collapse(2)
     for (int i = 0; i < filas; i++) {
         for (int j = 0; j < cols; j++) {
             SerVivo* s = grid[i][j].ocupante;
@@ -247,7 +248,7 @@ void limpiarAcciones(Celda** grid, int filas, int cols) {
 // ===================================================
 
 void reproducirPlantas(Celda** grid, int filas, int cols) {
-    #pragma omp parallel for collapse(2)
+    #pragma omp for collapse(2)
     for (int i = 0; i < filas; i++) {
         for (int j = 0; j < cols; j++) {
             SerVivo* ocupante = grid[i][j].ocupante;
@@ -294,7 +295,7 @@ siguiente_planta:;
 }
 
 void reproducirHervivoros(Celda** grid, int filas, int cols) {
-    #pragma omp parallel for collapse(2)
+    #pragma omp for collapse(2)
     for (int i = 0; i < filas; i++) {
         for (int j = 0; j < cols; j++) {
             SerVivo* h = grid[i][j].ocupante;
@@ -340,7 +341,7 @@ siguiente:;
 }
 
 void reproducirCarnivoros(Celda** grid, int filas, int cols) {
-    #pragma omp parallel for collapse(2)
+    #pragma omp for collapse(2)
     for (int i = 0; i < filas; i++) {
         for (int j = 0; j < cols; j++) {
             SerVivo* c = grid[i][j].ocupante;
@@ -390,7 +391,7 @@ siguiente:;
 // ================ CONSUMO DE RECURSOS ==============
 // ===================================================
 void herbivorosConsume(Celda** grid, int filas, int cols) {
-    #pragma omp parallel for collapse(2)
+    #pragma omp for collapse(2)
     for (int i = 0; i < filas; i++) {
         for (int j = 0; j < cols; j++) {
             SerVivo* h = grid[i][j].ocupante;
@@ -429,7 +430,7 @@ siguiente_herbivoro:;
 }
 
 void carnivorosConsume(Celda** grid, int filas, int cols) {
-    #pragma omp parallel for collapse(2)
+    #pragma omp for collapse(2)
     for (int i = 0; i < filas; i++) {
         for (int j = 0; j < cols; j++) {
             SerVivo* c = grid[i][j].ocupante;
@@ -489,7 +490,7 @@ siguiente_carnivoro:;
 
 // Movimiento de Herbívoros
 void moverHerbivoros(Celda** grid, int filas, int cols) {
-    #pragma omp parallel for collapse(2)
+    #pragma omp for collapse(2)
     for (int i = 0; i < filas; i++) {
         for (int j = 0; j < cols; j++) {
             SerVivo* h = grid[i][j].ocupante;
@@ -543,7 +544,7 @@ void moverHerbivoros(Celda** grid, int filas, int cols) {
 
 // Movimiento de Carnívoros
 void moverCarnivoros(Celda** grid, int filas, int cols) {
-    #pragma omp parallel for collapse(2)
+    #pragma omp for collapse(2)
     for (int i = 0; i < filas; i++) {
         for (int j = 0; j < cols; j++) {
             SerVivo* c = grid[i][j].ocupante;
@@ -631,22 +632,25 @@ int main(){
     for (int tick = 0; tick < MAX_TICKS; tick++){
         printf("tick: %d\n", tick);
 
-        // Movimiento primero (huida/búsqueda)
-        moverHerbivoros(mundo, FILAS, COLUMNAS);
-        moverCarnivoros(mundo, FILAS, COLUMNAS);
+        #pragma omp parallel
+        {
+            // Movimiento (huida/búsqueda)
+            moverHerbivoros(mundo, FILAS, COLUMNAS);
+            moverCarnivoros(mundo, FILAS, COLUMNAS);
 
-        // Consumo de recursos
-        herbivorosConsume(mundo, FILAS, COLUMNAS);
-        carnivorosConsume(mundo, FILAS, COLUMNAS);
+            // Consumo de recursos
+            herbivorosConsume(mundo, FILAS, COLUMNAS);
+            carnivorosConsume(mundo, FILAS, COLUMNAS);
 
-        // Reproducción
-        reproducirPlantas(mundo, FILAS, COLUMNAS); 
-        reproducirHervivoros(mundo, FILAS, COLUMNAS);
-        reproducirCarnivoros(mundo, FILAS, COLUMNAS);
+            // Reproducción
+            reproducirPlantas(mundo, FILAS, COLUMNAS); 
+            reproducirHervivoros(mundo, FILAS, COLUMNAS);
+            reproducirCarnivoros(mundo, FILAS, COLUMNAS);
 
-        // Actualización y limpieza
-        actualizarEstado(mundo, FILAS, COLUMNAS);
-        limpiarMuertos(mundo, FILAS, COLUMNAS);
+            // Actualización y limpieza
+            actualizarEstado(mundo, FILAS, COLUMNAS);
+            limpiarMuertos(mundo, FILAS, COLUMNAS);
+        }
 
         // Contar y mostrar estado
         plantas = hervivoros = carnivoros = 0;
