@@ -31,6 +31,12 @@ reglas del ecosistema:
 // ===================================================
 // =================== ENUMS Y ESTRUCTURAS ===========
 // ===================================================
+
+/*
+En esta sección del código se definen estructuras y tipos para representar un ecosistema
+    en el que conviven diferentes tipos de seres vivos, con estados 
+    y acciones posibles.
+*/
 //tipos de ser vivos
 typedef enum {
     VACIO, 
@@ -66,6 +72,19 @@ typedef struct {
 // ===================================================
 // ================== FUNCIONES HELPERS ==============
 // ===================================================
+
+
+/*
+    Reserva memoria dinámica para una matriz de celdas que representa 
+    el ecosistema y la inicializa con celdas vacías.
+
+    Parámetros:
+        - filas: número de filas de la matriz.
+        - cols: número de columnas de la matriz.
+
+    Retorna:
+        - Un puntero doble a Celda, que apunta a la matriz creada.
+*/
 Celda** crearMatriz(int filas, int cols) {
     Celda** grid = malloc(filas * sizeof(Celda*));
     for (int i = 0; i < filas; i++) {
@@ -77,7 +96,10 @@ Celda** crearMatriz(int filas, int cols) {
     return grid;
 }
 
-//crear ser vivo random
+/*
+Crea un ser vivo random 
+*/
+
 SerVivo* crearRandom() {
     //random del 0 al 9
     int r = rand() % 10; 
@@ -123,6 +145,18 @@ void poblarMatriz(Celda** grid, int filas, int cols) {
     }
 }
 
+/*Recorre la matriz de celdas y muestra en consola el contenido de cada posición.
+    - Si la celda está vacía, imprime una "B" (vacío).
+    - Si hay un ser vivo, imprime su símbolo con color según su tipo:
+        - P: Planta (VERDE)
+        - H: Herbívoro (AZUL)
+        - C: Carnívoro (ROJO)
+
+    Parámetros:
+        - grid: matriz de celdas (Celda**).
+        - filas: número de filas de la matriz.
+        - cols: número de columnas de la matriz.
+*/
 void imprimirMatriz(Celda** grid, int filas, int cols) {
     for (int i = 0; i < filas; i++) {
         for (int j = 0; j < cols; j++) {
@@ -141,7 +175,22 @@ void imprimirMatriz(Celda** grid, int filas, int cols) {
         printf("\n");
     }
 }
+/*
+    -------------------------
+    Recorre la matriz y cuenta cuántos seres vivos de cada tipo hay.
+    El conteo se realiza en paralelo usando OpenMP para mejorar el rendimiento.
 
+    Parámetros:
+        - grid: matriz de celdas (Celda**).
+        - filas: número de filas de la matriz.
+        - cols: número de columnas de la matriz.
+        - plantas: puntero a entero donde se almacenará el número de plantas.
+        - hervivoros: puntero a entero donde se almacenará el número de herbívoros.
+        - carnivoros: puntero a entero donde se almacenará el número de carnívoros.
+
+        - Se usa `#pragma omp parallel for reduction(+:p,h,c)` para sumar 
+          en paralelo sin condiciones de carrera.
+*/
 void contarSeresVivos(Celda** grid, int filas, int cols, int* plantas, int* hervivoros, int* carnivoros) {
     int p = 0, h = 0, c = 0;
 
@@ -168,6 +217,13 @@ void contarSeresVivos(Celda** grid, int filas, int cols, int* plantas, int* herv
 // ===================================================
 // ============== ESTADO Y LIMPIEZA ==================
 // ===================================================
+/**
+ * @brief Actualiza el estado de todos los seres vivos en la matriz (edad, energía, etc.).
+ * 
+ * @param grid Matriz de celdas a actualizar.
+ * @param filas Número de filas de la matriz.
+ * @param cols Número de columnas de la matriz.
+ */
 void actualizarEstado(Celda** grid, int filas, int cols) {
     #pragma omp for collapse(2)
     for (int i = 0; i < filas; i++) {
@@ -184,6 +240,17 @@ void actualizarEstado(Celda** grid, int filas, int cols) {
     }
 }
 
+
+/**
+ * @brief Verifica si una planta está rodeada por otros seres vivos.
+ * 
+ * @param grid Matriz de celdas.
+ * @param i Índice de fila de la planta.
+ * @param j Índice de columna de la planta.
+ * @param filas Número de filas de la matriz.
+ * @param cols Número de columnas de la matriz.
+ * @return int 1 si la planta está rodeada, 0 en caso contrario.
+ */
 // planta encerrada
 static inline int ansiedadPlantas(Celda** grid, int i, int j, int filas, int cols) {
     for (int dx = -1; dx <= 1; dx++) {
@@ -200,6 +267,14 @@ static inline int ansiedadPlantas(Celda** grid, int i, int j, int filas, int col
     return 1;
 }
 
+
+/**
+ * @brief Elimina los seres vivos muertos de la matriz según su estado.
+ * 
+ * @param grid Matriz de celdas a limpiar.
+ * @param filas Número de filas de la matriz.
+ * @param cols Número de columnas de la matriz.
+ */
 void limpiarMuertos(Celda** grid, int filas, int cols) {
     #pragma omp for collapse(2)
     for (int i = 0; i < filas; i++) {
@@ -231,6 +306,14 @@ void limpiarMuertos(Celda** grid, int filas, int cols) {
     }
 }
 
+
+/**
+ * @brief Reinicia las acciones de todos los seres vivos en la matriz a NINGUNA.
+ * 
+ * @param grid Matriz de celdas a actualizar.
+ * @param filas Número de filas de la matriz.
+ * @param cols Número de columnas de la matriz.
+ */
 void limpiarAcciones(Celda** grid, int filas, int cols) {
     #pragma omp for collapse(2)
     for (int i = 0; i < filas; i++) {
@@ -247,6 +330,15 @@ void limpiarAcciones(Celda** grid, int filas, int cols) {
 // ==================== REPRODUCCIÓN =================
 // ===================================================
 
+
+
+/**
+ * @brief Maneja la reproducción de las plantas en la matriz.
+ * 
+ * @param grid Matriz de celdas.
+ * @param filas Número de filas de la matriz.
+ * @param cols Número de columnas de la matriz.
+ */
 void reproducirPlantas(Celda** grid, int filas, int cols) {
     #pragma omp for collapse(2)
     for (int i = 0; i < filas; i++) {
@@ -294,6 +386,14 @@ siguiente_planta:;
     }
 }
 
+
+/**
+ * @brief Maneja la reproducción de los herbívoros en la matriz.
+ * 
+ * @param grid Matriz de celdas.
+ * @param filas Número de filas de la matriz.
+ * @param cols Número de columnas de la matriz.
+ */
 void reproducirHervivoros(Celda** grid, int filas, int cols) {
     #pragma omp for collapse(2)
     for (int i = 0; i < filas; i++) {
@@ -340,6 +440,15 @@ siguiente:;
     }
 }
 
+
+
+/**
+ * @brief Maneja la reproducción de los carnívoros en la matriz.
+ * 
+ * @param grid Matriz de celdas.
+ * @param filas Número de filas de la matriz.
+ * @param cols Número de columnas de la matriz.
+ */
 void reproducirCarnivoros(Celda** grid, int filas, int cols) {
     #pragma omp for collapse(2)
     for (int i = 0; i < filas; i++) {
@@ -390,6 +499,16 @@ siguiente:;
 // ===================================================
 // ================ CONSUMO DE RECURSOS ==============
 // ===================================================
+
+
+
+/**
+ * @brief Maneja el consumo de plantas por parte de los herbívoros en la matriz.
+ * 
+ * @param grid Matriz de celdas.
+ * @param filas Número de filas de la matriz.
+ * @param cols Número de columnas de la matriz.
+ */
 void herbivorosConsume(Celda** grid, int filas, int cols) {
     #pragma omp for collapse(2)
     for (int i = 0; i < filas; i++) {
@@ -429,6 +548,14 @@ siguiente_herbivoro:;
     }
 }
 
+
+/**
+ * @brief Maneja el consumo de herbívoros o plantas por parte de los carnívoros en la matriz.
+ * 
+ * @param grid Matriz de celdas.
+ * @param filas Número de filas de la matriz.
+ * @param cols Número de columnas de la matriz.
+ */
 void carnivorosConsume(Celda** grid, int filas, int cols) {
     #pragma omp for collapse(2)
     for (int i = 0; i < filas; i++) {
@@ -488,6 +615,15 @@ siguiente_carnivoro:;
 // ======================== MOVIMIENTO =====================
 // ===================================================
 
+
+
+/**
+ * @brief Mueve a los herbívoros en la matriz, evitando depredadores.
+ * 
+ * @param grid Matriz de celdas.
+ * @param filas Número de filas de la matriz.
+ * @param cols Número de columnas de la matriz.
+ */
 // Movimiento de Herbívoros
 void moverHerbivoros(Celda** grid, int filas, int cols) {
     #pragma omp for collapse(2)
@@ -542,6 +678,16 @@ void moverHerbivoros(Celda** grid, int filas, int cols) {
     }
 }
 
+
+
+
+/**
+ * @brief Mueve a los carnívoros en la matriz, buscando presas.
+ * 
+ * @param grid Matriz de celdas.
+ * @param filas Número de filas de la matriz.
+ * @param cols Número de columnas de la matriz.
+ */
 // Movimiento de Carnívoros
 void moverCarnivoros(Celda** grid, int filas, int cols) {
     #pragma omp for collapse(2)
